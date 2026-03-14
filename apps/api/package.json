@@ -1,0 +1,18 @@
+{
+  "name": "api",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "nest start --watch",
+    "build": "nest build",
+    "test": "jest",
+    "test:unit": "jest --testPathPattern=test/unit",
+    "test:int": "jest --testPathPattern=test/integration",
+    "test:e2e": "jest --testPathPattern=test/e2e",
+    "test:cov": "jest --coverage",
+    "db:migrate": "prisma migrate dev",
+    "db:migrate:test": "dotenv -e ../../.env -- prisma migrate deploy --schema=./src/prisma/schema.prisma",
+    "db:seed": "ts-node src/prisma/seed.ts",
+    "lint": "eslint \"src/**/*.ts\""
+  }
+}
