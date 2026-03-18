@@ -1,0 +1,130 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Organization {
+  id        String    @id @default(uuid())
+  name      String
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  users      User[]
+  categories Category[]
+  products   Product[]
+  movements  StockMovement[]
+
+  @@map("organizations")
+}
+
+model User {
+  id             String    @id @default(uuid())
+  email          String    @unique
+  role           Role
+  organizationId String?   @map("organization_id")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  magicLinkTokens MagicLinkToken[]
+  movements      StockMovement[]
+
+  @@index([organizationId])
+  @@index([deletedAt])
+  @@map("users")
+}
+
+model MagicLinkToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  token     String    @unique
+  usedAt    DateTime? @map("used_at")
+  expiresAt DateTime  @map("expires_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([token])
+  @@map("magic_link_tokens")
+}
+
+model Category {
+  id             String    @id @default(uuid())
+  name           String
+  organizationId String    @map("organization_id")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  products       Product[]
+
+  @@index([organizationId])
+  @@index([organizationId, createdAt, id])
+  @@map("categories")
+}
+
+model Product {
+  id             String    @id @default(uuid())
+  name           String
+  sku            String?
+  minimumStock   Int       @default(0) @map("minimum_stock")
+  quantity       Int       @default(0)
+  categoryId     String    @map("category_id")
+  organizationId String    @map("organization_id")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  deletedAt      DateTime? @map("deleted_at")
+
+  category       Category  @relation(fields: [categoryId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  movements      StockMovement[]
+
+  @@unique([sku, organizationId])
+  @@index([organizationId])
+  @@index([organizationId, createdAt, id])
+  @@index([deletedAt])
+  @@map("products")
+}
+
+model StockMovement {
+  id             String        @id @default(uuid())
+  type           MovementType
+  quantity       Int
+  productId      String        @map("product_id")
+  userId         String        @map("user_id")
+  organizationId String        @map("organization_id")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+  deletedAt      DateTime?     @map("deleted_at")
+
+  product        Product       @relation(fields: [productId], references: [id])
+  user           User          @relation(fields: [userId], references: [id])
+  organization   Organization  @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+  @@index([organizationId, createdAt, id])
+  @@index([productId])
+  @@index([deletedAt])
+  @@map("stock_movements")
+}
+
+enum Role {
+  admin
+  gestor
+  operador
+}
+
+enum MovementType {
+  inflow
+  outflow
+}
