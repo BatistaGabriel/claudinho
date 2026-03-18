@@ -1,3 +1,7 @@
+// NOTE: Refresh tokens are stored in Redis (not PostgreSQL) with TTL equal to token expiry.
+// Key pattern: session:refresh:{userId} → hashed token value
+// See CLAUDE.MD §Authentication for the full specification.
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -54,7 +58,6 @@ model MagicLinkToken {
   user      User      @relation(fields: [userId], references: [id])
 
   @@index([userId])
-  @@index([token])
   @@map("magic_link_tokens")
 }
 
