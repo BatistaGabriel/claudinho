@@ -114,6 +114,23 @@ export class Product {
     this._updatedAt = new Date()
   }
 
+  update(fields: { name?: string; categoryId?: string; minimumStock?: number }): void {
+    if (fields.name !== undefined) {
+      if (!fields.name || fields.name.trim() === '') throw new Error('PRODUCT_NAME_REQUIRED')
+      this._name = fields.name
+    }
+    if (fields.categoryId !== undefined) {
+      if (!fields.categoryId || fields.categoryId.trim() === '')
+        throw new Error('CATEGORY_REQUIRED')
+      this._categoryId = fields.categoryId
+    }
+    if (fields.minimumStock !== undefined) {
+      if (fields.minimumStock < 0) throw new Error('INVALID_MINIMUM_STOCK')
+      this._minimumStock = fields.minimumStock
+    }
+    this._updatedAt = new Date()
+  }
+
   applyStockMovement(type: MovementType, quantity: number): void {
     if (type === 'outflow' && quantity > this._quantity) {
       throw new Error('INSUFFICIENT_STOCK')
