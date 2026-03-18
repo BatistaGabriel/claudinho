@@ -82,5 +82,24 @@ describe('CreateInflowUseCase', () => {
         expect.objectContaining({ event: 'dashboard.updated' }),
       )
     })
+
+    it('should NOT call cache or SSE when movement creation fails due to invalid quantity', async () => {
+      const repository = createMockRepository()
+      const cacheService = createMockCacheService()
+      const pubSubService = createMockPubSubService()
+      const useCase = new CreateInflowUseCase(repository, cacheService, pubSubService)
+
+      await expect(
+        useCase.execute({
+          productId: 'prod-1',
+          userId: 'user-1',
+          quantity: 0,
+          organizationId: 'org-1',
+        }),
+      ).rejects.toThrow('INVALID_QUANTITY')
+
+      expect(cacheService.invalidate).not.toHaveBeenCalled()
+      expect(pubSubService.publish).not.toHaveBeenCalled()
+    })
   })
 })
