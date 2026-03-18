@@ -11,6 +11,6 @@ module.exports = {
   moduleNameMapper: {
     '^@claudinho/shared$': '<rootDir>/../../packages/shared/src/index.ts',
   },
-  setupFilesAfterFramework: ['<rootDir>/src/test-setup.ts'],
+  setupFilesAfterEnv: ['<rootDir>/src/test-setup.ts'],
   testTimeout: 10000,
 }
