@@ -2,12 +2,10 @@ import { RequestMagicLinkUseCase } from '../../../../src/modules/auth/applicatio
 import { IMagicLinkTokenRepository } from '../../../../src/modules/auth/domain/magic-link-token.repository'
 import { IEmailQueue } from '../../../../src/modules/auth/application/use-cases/request-magic-link.use-case'
 
-function createMockTokenRepository(
-  opts: { existingToken?: string } = {},
-): jest.Mocked<IMagicLinkTokenRepository> {
+function createMockTokenRepository(): jest.Mocked<IMagicLinkTokenRepository> {
   return {
     save: jest.fn().mockResolvedValue(undefined),
-    findByEmail: jest.fn().mockResolvedValue(opts.existingToken ?? null),
+    findByEmail: jest.fn().mockResolvedValue(null),
     invalidatePreviousTokensForUser: jest.fn().mockResolvedValue(undefined),
   } as unknown as jest.Mocked<IMagicLinkTokenRepository>
 }
@@ -19,15 +17,10 @@ function createMockBullQueue(): jest.Mocked<IEmailQueue> {
 }
 
 describe('RequestMagicLinkUseCase', () => {
-  const tokenRepository = createMockTokenRepository()
-
-  beforeEach(() => {
-    jest.clearAllMocks()
-  })
-
   it('should enqueue email job after persisting token', async () => {
+    const repository = createMockTokenRepository()
     const emailQueue = createMockBullQueue()
-    const useCase = new RequestMagicLinkUseCase(tokenRepository, emailQueue)
+    const useCase = new RequestMagicLinkUseCase(repository, emailQueue)
 
     await useCase.execute({ email: 'user@test.com', userId: 'user-1' })
 
@@ -38,7 +31,7 @@ describe('RequestMagicLinkUseCase', () => {
   })
 
   it('should invalidate previous token when new magic link is requested', async () => {
-    const repository = createMockTokenRepository({ existingToken: 'old-token' })
+    const repository = createMockTokenRepository()
     const useCase = new RequestMagicLinkUseCase(repository, createMockBullQueue())
 
     await useCase.execute({ email: 'user@test.com', userId: 'user-1' })
