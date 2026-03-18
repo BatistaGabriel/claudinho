@@ -388,6 +388,115 @@ describe('RedisPubSubService', () => {
 
 ---
 
+## Segurança e Sanitização (Shift-Left)
+
+Esta seção define os controles de segurança obrigatórios que devem ser aplicados durante a implementação de cada repositório — não como checklist de revisão posterior, mas como parte do ciclo TDD de cada etapa.
+
+---
+
+### Injeção SQL — `$queryRaw` seguro
+
+O único uso de raw query nesta sprint é o `SELECT ... FOR UPDATE` em `PrismaProductRepository`. Regra absoluta:
+
+```typescript
+// ✅ CORRETO — tagged template literal: Prisma parametriza automaticamente
+await tx.$queryRaw`SELECT quantity FROM products WHERE id = ${id} FOR UPDATE`
+
+// ❌ PROIBIDO — string concatenada: vulnerável a SQL injection
+await tx.$queryRawUnsafe(`SELECT quantity FROM products WHERE id = '${id}' FOR UPDATE`)
+```
+
+O Semgrep rodando no pre-commit (já configurado no projeto) deve ter uma regra que flagga qualquer uso de `$queryRawUnsafe`. Confirmar na Etapa 0.
+
+---
+
+### Sanitização na fronteira do repositório
+
+O repositório é a última camada antes do banco. Todo método público deve validar antes de executar qualquer query:
+
+```typescript
+// Obrigatório em todo método que recebe TenantContext
+if (!ctx.organizationId || !isUUID(ctx.organizationId)) {
+  throw new Error('INVALID_TENANT_CONTEXT')
+}
+
+// Obrigatório em métodos que recebem cursor de paginação
+if (cursor) {
+  const decoded = decodeCursor(cursor) // base64 decode + parse
+  if (!decoded || !decoded.createdAt || !decoded.id) {
+    throw new Error('INVALID_CURSOR')
+  }
+}
+```
+
+Isso previne que dados malformados cheguem ao Prisma e garante que o `organizationId` sempre vem de uma fonte confiável (JWT verificado) — nunca de input direto do usuário.
+
+---
+
+### Armazenamento seguro de tokens
+
+Tokens de autenticação (magic link e refresh token) **nunca são armazenados em texto puro**. O banco armazena apenas o hash SHA-256 do valor; o valor raw é transmitido apenas uma vez (no link de email ou na resposta HTTP) e descartado.
+
+```typescript
+// Ao persistir — armazena apenas o hash
+const tokenHash = createHash('sha256').update(rawToken).digest('hex')
+await prisma.magicLinkToken.create({ data: { tokenHash, userId, expiresAt } })
+
+// Ao validar — compara hashes
+const tokenHash = createHash('sha256').update(incomingRawToken).digest('hex')
+const record = await prisma.magicLinkToken.findUnique({ where: { tokenHash } })
+```
+
+Testes de integração devem verificar que:
+
+- O valor retornado pelo repositório em `create` é o raw token (para ser enviado no email)
+- O banco **nunca** contém o valor raw — apenas o hash
+- A busca por token inválido retorna `null`, não erro (anti-enumeração)
+
+---
+
+### Dados sensíveis fora de logs e erros
+
+Campos sensíveis nunca devem aparecer em mensagens de erro, stack traces ou logs:
+
+- `MagicLinkToken.tokenHash` — nunca logar
+- `RefreshToken.tokenHash` — nunca logar
+- `User.email` em erros de negócio deve ser mascarado (`u***@domain.com`)
+
+O mapeamento da entidade Prisma para a entidade de domínio é o ponto onde esses campos são filtrados. O método `toDomain()` de cada repositório não deve expor campos que o domínio não precisa.
+
+---
+
+### Soft delete como controle de acesso
+
+Registros com `deletedAt` preenchido são **inacessíveis**, mesmo que o `id` seja conhecido pelo tenant correto:
+
+```typescript
+// ✅ findById também filtra soft delete
+async findById(id: string, ctx: TenantContext): Promise<Product | null> {
+  return prisma.product.findFirst({
+    where: { id, organizationId: ctx.organizationId, deletedAt: null }
+  })
+}
+```
+
+Usar `findFirst` com `deletedAt: null` em vez de `findUnique` é obrigatório em todos os métodos de busca por ID — `findUnique` não aceita o filtro `deletedAt` de forma segura.
+
+---
+
+### Checklist de segurança por etapa
+
+Antes de abrir o PR de cada etapa, verificar:
+
+- [ ] Nenhum uso de `$queryRawUnsafe` (Semgrep confirma)
+- [ ] Todo método público valida `organizationId` antes da query
+- [ ] Tokens armazenados como hash SHA-256, nunca em texto puro
+- [ ] `findById` filtra `deletedAt: null` (não usa `findUnique` sem esse filtro)
+- [ ] Nenhum campo sensível presente em mensagens de erro ou no retorno do repositório
+- [ ] TruffleHog não detecta segredos no diff (pre-commit já executa)
+
+---
+
 ## Critérios de Conclusão da Sprint
 
 - [ ] Etapa 0 concluída: schema validado, índices compostos `(organization_id, created_at, id)` confirmados em todas as tabelas paginadas
@@ -402,3 +511,5 @@ describe('RedisPubSubService', () => {
 - [ ] PR final `staging` → `main` aprovado após todos os módulos mergeados em staging
 - [ ] Nenhum commit mistura teste + implementação
 - [ ] Cada PR inclui revisão OWASP com atenção a A01 (tenant isolation) e A03 (injeção em `$queryRaw`)
+- [ ] Checklist de segurança por etapa concluído antes de cada PR (ver seção Segurança e Sanitização)
+- [ ] Tokens armazenados como hash SHA-256 — banco não contém nenhum valor raw
