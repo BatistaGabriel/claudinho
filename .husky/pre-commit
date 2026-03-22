@@ -1,1 +1,2 @@
 pnpm lint-staged
+semgrep --config .semgrep/rules.yml --error apps/api/src
