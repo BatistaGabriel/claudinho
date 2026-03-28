@@ -17,7 +17,12 @@
         "dbaeumer.vscode-eslint",
         "esbenp.prettier-vscode",
         "eamodio.gitlens",
-        "Anthropic.claude-code"
+        "Anthropic.claude-code",
+        "christian-kohler.path-intellisense",
+        "wix.vscode-import-cost",
+        "EditorConfig.EditorConfig",
+        "ms-azuretools.vscode-containers",
+        "IBM.output-colorizer"
       ],
       "settings": {
         "editor.formatOnSave": true,
