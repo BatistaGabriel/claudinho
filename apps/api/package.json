@@ -7,11 +7,11 @@
     "build": "nest build",
     "test": "jest",
     "test:unit": "jest --testPathPattern=test/unit",
-    "test:int": "jest --testPathPattern=test/integration",
+    "test:int": "dotenv -e ../../.env -- jest --config test/integration/jest.config.int.ts",
     "test:e2e": "jest --testPathPattern=test/e2e",
     "test:cov": "jest --coverage",
     "db:migrate": "prisma migrate dev",
-    "db:migrate:test": "dotenv -e ../../.env -- prisma migrate deploy --schema=./src/prisma/schema.prisma",
+    "db:migrate:test": "dotenv -e ../../.env -- sh -c 'DATABASE_URL=$DATABASE_URL_TEST prisma migrate deploy --schema=./src/prisma/schema.prisma'",
     "db:seed": "ts-node src/prisma/seed.ts",
     "lint": "eslint \"src/**/*.ts\""
   },

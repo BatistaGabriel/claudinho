@@ -115,15 +115,15 @@ pnpm db:seed             # populate the development database with seed data
 
 `pnpm db:seed` creates ready-to-use fictional data for local development:
 
-| Entity | What is created |
-| --- | --- |
-| Admin | 1 platform admin user (`admin@claudinho.dev`) |
-| Organizations | 2 fictional organizations (`Loja Alpha` and `Mercado Beta`) |
-| Managers | 1 manager per organization (`gestor@alpha.dev` / `gestor@beta.dev`) |
-| Operators | 2 operators per organization |
-| Categories | 5 categories per organization |
-| Products | 20 products per organization, with varied stock levels (some at critical threshold) |
-| Movements | 50 stock movements per organization over the last 30 days |
+| Entity        | What is created                                                                     |
+| ------------- | ----------------------------------------------------------------------------------- |
+| Admin         | 1 platform admin user (`admin@claudinho.dev`)                                       |
+| Organizations | 2 fictional organizations (`Loja Alpha` and `Mercado Beta`)                         |
+| Managers      | 1 manager per organization (`gestor@alpha.dev` / `gestor@beta.dev`)                 |
+| Operators     | 2 operators per organization                                                        |
+| Categories    | 5 categories per organization                                                       |
+| Products      | 20 products per organization, with varied stock levels (some at critical threshold) |
+| Movements     | 50 stock movements per organization over the last 30 days                           |
 
 Since login uses magic links there are no passwords. To authenticate locally, the seed also prints an access token for each created user to stdout, ready to use in the `Authorization: Bearer <token>` header.
 
@@ -211,13 +211,13 @@ src/modules/products/
 
 NestJS is an opinionated framework that inevitably appears in parts of the code. Explicit rules about what is allowed in each layer:
 
-| Layer | Allowed | Blocked |
-| --- | --- | --- |
-| `domain/` | nothing from NestJS | any `@nestjs/*` import |
-| `application/` | nothing from NestJS | any `@nestjs/*` import |
-| `infrastructure/` | `@Injectable()`, `@InjectRepository()` | business logic, domain rules |
-| `presentation/` | NestJS decorators (`@Controller`, `@Get`, `@Body`, `@UseGuards`) | business logic, direct database queries |
-| `*.module.ts` | anything from NestJS | business logic |
+| Layer             | Allowed                                                          | Blocked                                 |
+| ----------------- | ---------------------------------------------------------------- | --------------------------------------- |
+| `domain/`         | nothing from NestJS                                              | any `@nestjs/*` import                  |
+| `application/`    | nothing from NestJS                                              | any `@nestjs/*` import                  |
+| `infrastructure/` | `@Injectable()`, `@InjectRepository()`                           | business logic, domain rules            |
+| `presentation/`   | NestJS decorators (`@Controller`, `@Get`, `@Body`, `@UseGuards`) | business logic, direct database queries |
+| `*.module.ts`     | anything from NestJS                                             | business logic                          |
 
 Bootstrapping, configuration modules, structural decorators and DI providers are the only exceptions where NestJS appears outside the presentation layer — they are necessary and expected. Domain and use cases must be testable without instantiating NestJS.
 
@@ -296,9 +296,9 @@ The email delivery job (BullMQ) is configured as follows:
 
 When the access token expires, the front-end calls `POST /api/v1/auth/refresh` with the refresh token. The API validates it, issues a new token pair and invalidates the used refresh token.
 
-- **Mandatory rotation:** refresh tokens are rotated on every use — each call to the refresh endpoint issues a new refresh token and invalidates the previous one. Reusing an already-rotated refresh token is treated as a potential compromise and immediately invalidates the entire user session (cascade revocation)
-- **Storage:** the hash of the valid refresh token is stored in Redis with a TTL equal to the token's expiry time. Validation compares the received token against the stored hash — a refresh token absent from Redis means the session has expired or been revoked
-- **Explicit revocation:** logout revokes the refresh token immediately by removing the Redis entry — the access token remains valid until it expires naturally (no access token denylist in the MVP)
+- **Mandatory rotation:** refresh tokens are rotated on every use — each call to the refresh endpoint issues a new refresh token and invalidates the previous one. Reusing an already-rotated refresh token is treated as a potential compromise and immediately invalidates the entire user session (cascade revocation — all `refresh_tokens` records for that user are revoked)
+- **Storage:** the SHA-256 hash of the valid refresh token is stored in PostgreSQL (`refresh_tokens` table). Validation compares the hash of the received token against the stored hash — a token absent from the database or with `revokedAt` set means the session has expired or been revoked. Expired tokens (`expiresAt < now`) are cleaned up by a background job
+- **Explicit revocation:** logout revokes the refresh token immediately by setting `revokedAt` on the record — the access token remains valid until it expires naturally (no access token denylist in the MVP)
 
 ### Authorization
 
@@ -318,11 +318,11 @@ The tenant isolation guard is global — it runs on all requests by default. Rou
 
 Public routes in the MVP:
 
-| Route | Reason |
-| --- | --- |
-| `POST /api/v1/auth/magic-link` | magic link request — no authenticated user |
-| `GET /api/v1/auth/magic-link/callback` | authentication callback — no JWT yet |
-| `GET /api/v1/health` | infrastructure health check — no authentication required |
+| Route                                  | Reason                                                   |
+| -------------------------------------- | -------------------------------------------------------- |
+| `POST /api/v1/auth/magic-link`         | magic link request — no authenticated user               |
+| `GET /api/v1/auth/magic-link/callback` | authentication callback — no JWT yet                     |
+| `GET /api/v1/health`                   | infrastructure health check — no authentication required |
 
 Any new route that needs to be public must be added to this list and go through a security review before merging — routes incorrectly marked as public are a data exposure vector.
 
@@ -349,12 +349,12 @@ Any new route that needs to be public must be added to this list and go through 
 
 All validation happens before enqueuing the processing job — early rejection, no queue consumption:
 
-| Rule | Value |
-| --- | --- |
-| Maximum size | 5 MB |
+| Rule                | Value                                                                                                                    |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Maximum size        | 5 MB                                                                                                                     |
 | Accepted MIME types | `text/csv`, `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` (xlsx), `application/vnd.ms-excel` (xls) |
-| Accepted extensions | `.csv`, `.xlsx`, `.xls` |
-| Encoding (CSV) | UTF-8 required |
+| Accepted extensions | `.csv`, `.xlsx`, `.xls`                                                                                                  |
+| Encoding (CSV)      | UTF-8 required                                                                                                           |
 
 Files that fail validation return `422 Unprocessable Entity` with a specific error code (`INVALID_FILE_TYPE`, `FILE_TOO_LARGE`) before any upload to S3.
 
@@ -387,10 +387,9 @@ The job validates each line individually. Invalid lines do not block the process
 - **Engine:** Redis (same instance used by BullMQ)
 - **Use cases in the MVP:**
   - Dashboard indicators cache — avoids recalculating heavy aggregates on every SSE connection
-  - Refresh token session cache — stores the valid refresh token hash per user
-- **Default TTL:** 60 seconds for dashboard data · equal to refresh token expiry for sessions
+- **Default TTL:** 60 seconds for dashboard data
 - **Invalidation:** the dashboard indicators cache is invalidated whenever a stock movement is recorded — via an internal event dispatched in the use case after persistence
-- **Key convention:** `{context}:{organizationId}:{identifier}` — e.g. `dashboard:indicators:org_123`, `session:refresh:user_456`
+- **Key convention:** `{context}:{organizationId}:{identifier}` — e.g. `dashboard:indicators:org_123`
 - **What not to cache:** transactional write data, import payloads, any data that is not tolerant of slightly stale reads
 
 ### Real-time
@@ -532,7 +531,7 @@ The dashboard displays a centralized stock health check with the following indic
 
 ## Coding Conventions
 
-All code in the project follows SOLID principles and is mandatorily covered by tests before it exists. The development cycle is Red-Green-Refactor without exceptions.
+All code in the project follows SOLID principles, Clean Code and is mandatorily covered by tests before it exists. The development cycle is Red-Green-Refactor without exceptions.
 
 ### SOLID
 
@@ -648,14 +647,14 @@ ECS performs rolling updates — during a deployment, the old and new versions r
 
 **Rule:** every migration going to production must be backward-compatible with the previous version of the code.
 
-| Operation | Safe? | Reason |
-| --- | --- | --- |
-| Add nullable column | Yes | old code ignores the new column |
-| Add NOT NULL column without default | No | old code does not send the value |
-| Rename column | No | old code references the old name |
-| Drop column | No | old code still reads the column |
-| Add index (CONCURRENTLY) | Yes | does not block reads/writes |
-| Change column type | Depends | evaluated case by case |
+| Operation                           | Safe?   | Reason                           |
+| ----------------------------------- | ------- | -------------------------------- |
+| Add nullable column                 | Yes     | old code ignores the new column  |
+| Add NOT NULL column without default | No      | old code does not send the value |
+| Rename column                       | No      | old code references the old name |
+| Drop column                         | No      | old code still reads the column  |
+| Add index (CONCURRENTLY)            | Yes     | does not block reads/writes      |
+| Change column type                  | Depends | evaluated case by case           |
 
 The two-step deprecation flow already covers unsafe cases — migration 1 (which runs alongside the new code) must always be backward-compatible. Migration 2 (actual removal) only runs after confirming that zero tasks from the old version are still active.
 
@@ -693,11 +692,11 @@ Every implementation is reviewed against the OWASP Top 10 and the CISA KEV (Know
 
 Applied globally on the API with stricter rules on sensitive endpoints — mitigates abuse, brute force and DDoS attempts. Implemented via `@nestjs/throttler`.
 
-| Endpoint | Limit | Window |
-| --- | --- | --- |
-| Global (all routes) | 100 requests | 1 minute per IP |
-| `POST /api/v1/auth/magic-link` | 5 requests | 15 minutes per IP |
-| `GET /api/v1/auth/magic-link/callback` | 10 requests | 15 minutes per IP |
+| Endpoint                               | Limit        | Window            |
+| -------------------------------------- | ------------ | ----------------- |
+| Global (all routes)                    | 100 requests | 1 minute per IP   |
+| `POST /api/v1/auth/magic-link`         | 5 requests   | 15 minutes per IP |
+| `GET /api/v1/auth/magic-link/callback` | 10 requests  | 15 minutes per IP |
 
 When the limit is exceeded, the API returns `429 Too Many Requests` with the standard error envelope (`code: RATE_LIMIT_EXCEEDED`).
 
@@ -722,21 +721,21 @@ Helmet enabled via NestJS native integration — sets security headers on all re
 - **Development:** local `.env`, never committed. `.env.example` committed with all variables without values as a reference
 - **Production:** AWS Secrets Manager
 
-| Variable | Description |
-| --- | --- |
-| `NODE_ENV` | Current environment (`development`, `staging`, `production`) |
-| `DATABASE_URL` | PostgreSQL connection string |
-| `DATABASE_URL_TEST` | Connection string for the dedicated integration test database |
-| `JWT_ACCESS_SECRET` | Access token secret |
-| `JWT_REFRESH_SECRET` | Refresh token secret |
-| `REDIS_URL` | Redis connection string (BullMQ) |
-| `AWS_ACCESS_KEY_ID` | AWS access key |
-| `AWS_SECRET_ACCESS_KEY` | AWS secret key |
-| `AWS_S3_BUCKET` | S3 bucket name |
-| `AWS_REGION` | AWS region |
-| `RESEND_API_KEY` | Resend API key |
-| `SENTRY_DSN` | Sentry DSN for error tracking (back-end and front-end) |
-| `CORS_ORIGINS` | Allowed origins (comma-separated) |
+| Variable                | Description                                                   |
+| ----------------------- | ------------------------------------------------------------- |
+| `NODE_ENV`              | Current environment (`development`, `staging`, `production`)  |
+| `DATABASE_URL`          | PostgreSQL connection string                                  |
+| `DATABASE_URL_TEST`     | Connection string for the dedicated integration test database |
+| `JWT_ACCESS_SECRET`     | Access token secret                                           |
+| `JWT_REFRESH_SECRET`    | Refresh token secret                                          |
+| `REDIS_URL`             | Redis connection string (BullMQ)                              |
+| `AWS_ACCESS_KEY_ID`     | AWS access key                                                |
+| `AWS_SECRET_ACCESS_KEY` | AWS secret key                                                |
+| `AWS_S3_BUCKET`         | S3 bucket name                                                |
+| `AWS_REGION`            | AWS region                                                    |
+| `RESEND_API_KEY`        | Resend API key                                                |
+| `SENTRY_DSN`            | Sentry DSN for error tracking (back-end and front-end)        |
+| `CORS_ORIGINS`          | Allowed origins (comma-separated)                             |
 
 ### Commits
 
@@ -757,17 +756,17 @@ test(stock-movements): add unit tests for create movement use case
 
 **Allowed types:**
 
-| Type | Usage |
-| --- | --- |
-| `feat` | New feature |
-| `fix` | Bug fix |
-| `test` | Adding or fixing tests |
-| `refactor` | Refactoring without behavior change |
-| `perf` | Performance improvement |
-| `chore` | Maintenance, dependencies, configuration |
-| `ci` | CI pipeline and configuration changes |
-| `docs` | Documentation |
-| `style` | Formatting, no logic change |
+| Type       | Usage                                    |
+| ---------- | ---------------------------------------- |
+| `feat`     | New feature                              |
+| `fix`      | Bug fix                                  |
+| `test`     | Adding or fixing tests                   |
+| `refactor` | Refactoring without behavior change      |
+| `perf`     | Performance improvement                  |
+| `chore`    | Maintenance, dependencies, configuration |
+| `ci`       | CI pipeline and configuration changes    |
+| `docs`     | Documentation                            |
+| `style`    | Formatting, no logic change              |
 
 #### Atomic Commits
 
@@ -859,13 +858,13 @@ Deployments on ECS are rolling updates — the previous version keeps running un
 
 **Alert thresholds:**
 
-| Alert | Threshold |
-| --- | --- |
-| Error rate per route | > 5% in a 5-minute window |
-| Response time | p95 > 2 s in a 5-minute window |
-| Jobs in DLQ | any job in the DLQ |
+| Alert                | Threshold                                  |
+| -------------------- | ------------------------------------------ |
+| Error rate per route | > 5% in a 5-minute window                  |
+| Response time        | p95 > 2 s in a 5-minute window             |
+| Jobs in DLQ          | any job in the DLQ                         |
 | BullMQ queue stalled | > 50 pending jobs for more than 10 minutes |
-| ECS CPU | > 80% for more than 5 minutes |
+| ECS CPU              | > 80% for more than 5 minutes              |
 
 ## Architecture Decision Records
 
@@ -1064,25 +1063,25 @@ Mandatory review before merging:
 
 ## Glossary
 
-| Term | Definition |
-| --- | --- |
-| **Tenant** | A registered organization in the system. Each tenant accesses exclusively its own data |
-| **organization_id** | Column present in all business tables that identifies which tenant a record belongs to |
-| **RLS** | Row Level Security — PostgreSQL feature that restricts which rows a user can access directly in the database |
-| **Soft delete** | Logical deletion strategy — records are not physically removed, only marked as deleted via the `deleted_at` column |
-| **Magic link** | Passwordless authentication method — the user receives a tokenized link by email that authenticates them when accessed |
-| **JWT** | JSON Web Token — signed token carrying user information (user_id, organization_id, role) used to authenticate requests |
-| **RBAC** | Role-Based Access Control — authorization model where permissions are defined by role (admin, manager, operator) |
-| **DLQ** | Dead Letter Queue — queue of jobs that failed and exhausted all retry attempts. Jobs in the DLQ are not discarded and can be reprocessed |
-| **SSE** | Server-Sent Events — unidirectional communication protocol where the server pushes updates to the client via a persistent HTTP connection |
-| **SAST** | Static Application Security Testing — security analysis of source code without executing the application |
-| **DAST** | Dynamic Application Security Testing — security analysis of the running application, simulating external attacks |
-| **IAST** | Instrumented Application Security Testing — security analysis at instrumented runtime during test suite execution |
-| **ADR** | Architecture Decision Record — document that records an architectural decision with context, options considered and rationale |
+| Term                        | Definition                                                                                                                                              |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Tenant**                  | A registered organization in the system. Each tenant accesses exclusively its own data                                                                  |
+| **organization_id**         | Column present in all business tables that identifies which tenant a record belongs to                                                                  |
+| **RLS**                     | Row Level Security — PostgreSQL feature that restricts which rows a user can access directly in the database                                            |
+| **Soft delete**             | Logical deletion strategy — records are not physically removed, only marked as deleted via the `deleted_at` column                                      |
+| **Magic link**              | Passwordless authentication method — the user receives a tokenized link by email that authenticates them when accessed                                  |
+| **JWT**                     | JSON Web Token — signed token carrying user information (user_id, organization_id, role) used to authenticate requests                                  |
+| **RBAC**                    | Role-Based Access Control — authorization model where permissions are defined by role (admin, manager, operator)                                        |
+| **DLQ**                     | Dead Letter Queue — queue of jobs that failed and exhausted all retry attempts. Jobs in the DLQ are not discarded and can be reprocessed                |
+| **SSE**                     | Server-Sent Events — unidirectional communication protocol where the server pushes updates to the client via a persistent HTTP connection               |
+| **SAST**                    | Static Application Security Testing — security analysis of source code without executing the application                                                |
+| **DAST**                    | Dynamic Application Security Testing — security analysis of the running application, simulating external attacks                                        |
+| **IAST**                    | Instrumented Application Security Testing — security analysis at instrumented runtime during test suite execution                                       |
+| **ADR**                     | Architecture Decision Record — document that records an architectural decision with context, options considered and rationale                           |
 | **Cursor-based pagination** | Pagination strategy that uses a pointer (cursor) to the current position instead of a numeric offset, guaranteeing consistency and constant performance |
-| **Health check** | In the dashboard context, a set of indicators showing the overall state of the stock (critical products, today's movements, stalled products) |
-| **Inflow** | Stock movement that increases the available quantity of a product |
-| **Outflow** | Stock movement that decreases the available quantity of a product. Blocked if the requested quantity exceeds the available quantity |
-| **Manager** (gestor) | User role with full access within their own organization — manages products, movements, the dashboard and operators |
-| **Operator** (operador) | User role with operational access — registers products, categories and records movements. No dashboard access |
-| **Admin** | Platform role with full system access — creates managers and accesses all organizations for support and maintenance |
+| **Health check**            | In the dashboard context, a set of indicators showing the overall state of the stock (critical products, today's movements, stalled products)           |
+| **Inflow**                  | Stock movement that increases the available quantity of a product                                                                                       |
+| **Outflow**                 | Stock movement that decreases the available quantity of a product. Blocked if the requested quantity exceeds the available quantity                     |
+| **Manager** (gestor)        | User role with full access within their own organization — manages products, movements, the dashboard and operators                                     |
+| **Operator** (operador)     | User role with operational access — registers products, categories and records movements. No dashboard access                                           |
+| **Admin**                   | Platform role with full system access — creates managers and accesses all organizations for support and maintenance                                     |

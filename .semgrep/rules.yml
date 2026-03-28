@@ -1,0 +1,19 @@
+rules:
+  - id: no-prisma-query-raw-unsafe
+    patterns:
+      - pattern: $CLIENT.$queryRawUnsafe(...)
+      - pattern: $CLIENT.$executeRawUnsafe(...)
+    message: |
+      Raw unsafe queries are forbidden. Use tagged template literals instead:
+        ✅  await tx.$queryRaw`SELECT ... WHERE id = ${id}`
+        ❌  await tx.$queryRawUnsafe(`SELECT ... WHERE id = '${id}'`)
+      Tagged template literals are parameterized automatically by Prisma,
+      preventing SQL injection.
+    languages: [typescript, javascript]
+    severity: ERROR
+    metadata:
+      category: security
+      cwe: CWE-89
+      owasp: A03:2021 - Injection
+      references:
+        - https://www.prisma.io/docs/concepts/components/prisma-client/raw-database-access#queryrawunsafe
