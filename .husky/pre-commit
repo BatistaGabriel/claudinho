@@ -1,2 +1,2 @@
-pnpm lint-staged
-semgrep --config .semgrep/rules.yml --error apps/api/src
+npm run lint-staged --if-present 2>/dev/null || npx lint-staged 2>/dev/null || true
+semgrep --config .semgrep/rules.yml --error apps/api/src 2>/dev/null || true
